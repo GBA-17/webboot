@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"os/exec"
 
 	"github.com/u-root/u-root/pkg/boot"
 	"github.com/u-root/u-root/pkg/boot/syslinux"
-	"github.com/u-root/u-root/pkg/mount"
-	"golang.org/x/sys/unix"
 )
 
 // ParseConfigFromISO mounts an iso file to a
@@ -19,12 +18,16 @@ func ParseConfigFromISO(isoPath string) ([]boot.OSImage, error) {
 		return nil, fmt.Errorf("Error creating mount dir: %v", err)
 	}
 
-	if _, err := mount.Mount(isoPath, tmp, "iso9660", "--bind", unix.MS_RDONLY|unix.MS_NOATIME); err != nil {
+	cmd := exec.Command("mount", isoPath, tmp)
+	err = cmd.Run()
+	if err != nil {
 		return nil, fmt.Errorf("Error mounting ISO: %v", err)
 	}
 
 	configOpts, sysErr := syslinux.ParseLocalConfig(context.Background(), tmp)
-	umountErr := mount.Unmount(tmp, true, false) //force umount
+	cmd = exec.Command("umount", tmp, "-l")
+	umountErr := cmd.Run()
+
 	if sysErr != nil {
 		return nil, fmt.Errorf("Error parsing config: %v", sysErr)
 	} else if umountErr != nil {

@@ -19,7 +19,19 @@ func TestParseConfigFromISO(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	fmt.Println(configOpts)
+
+	expectedLabels := [4]string{
+		"Boot TinyCorePure64",
+		"Boot TinyCorePure64 (on slow devices, waitusb=5)",
+		"Boot Core (command line only).",
+		"Boot Core (command line only on slow devices, waitusb=5)",
+	}
+
+	for i, config := range configOpts {
+		if config.Label() != expectedLabels[i] {
+			t.Error("Invalid configuration option found.")
+		}
+	}
 }
 
 func downloadTestISO(isoPath string) error {

@@ -6,13 +6,13 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/u-root/u-root/pkg/boot"
 	"github.com/u-root/u-root/pkg/boot/kexec"
 	"github.com/u-root/u-root/pkg/boot/syslinux"
 	"github.com/u-root/u-root/pkg/mount"
+	"github.com/u-root/u-root/pkg/mount/loop"
 	"golang.org/x/sys/unix"
 )
 
@@ -24,23 +24,23 @@ func ParseConfigFromISO(isoPath string) ([]boot.OSImage, error) {
 		return nil, fmt.Errorf("Error creating mount dir: %v", err)
 	}
 
-	cmd := exec.Command("mount", isoPath, tmp)
-	err = cmd.Run()
+	loopdev, err := loop.New(isoPath, "iso9660", "")
 	if err != nil {
-		return nil, fmt.Errorf("Error mounting ISO: %v, try running as sudo", err)
+		return nil, fmt.Errorf("Error creating loop device: %v", err)
 	}
 
-	configOpts, sysErr := syslinux.ParseLocalConfig(context.Background(), tmp)
-	cmd = exec.Command("umount", tmp, "-l")
-	umountErr := cmd.Run()
-
-	if sysErr != nil {
-		return nil, fmt.Errorf("Error parsing config: %v", sysErr)
-	} else if umountErr != nil {
-		return nil, fmt.Errorf("Error unmounting ISO: %v", umountErr)
-	} else { // success
-		return configOpts, nil
+	mp, err := loopdev.Mount(tmp, unix.MS_RDONLY|unix.MS_NOATIME)
+	if err != nil {
+		return nil, fmt.Errorf("Error mounting loop device: %v", err)
 	}
+	defer mp.Unmount(0)
+
+	configOpts, err := syslinux.ParseLocalConfig(context.Background(), tmp)
+	if err != nil {
+		return nil, fmt.Errorf("Error parsing config: %v", err)
+	}
+
+	return configOpts, nil
 }
 
 // BootFromPmem copies the ISO to pmem0 and boots

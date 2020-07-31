@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"os"
 	"testing"
-
-	"github.com/u-root/u-root/pkg/boot"
 )
 
 func TestParseConfigFromISO(t *testing.T) {
@@ -34,11 +32,6 @@ func TestParseConfigFromISO(t *testing.T) {
 			t.Error("Invalid configuration option found.")
 		}
 	}
-
-	a := configOpts[0]
-	b, ok := a.(*boot.LinuxImage)
-	fmt.Println(b, ok)
-	fmt.Printf("LEET LINUZZ %s", b.Name)
 }
 
 func downloadTestISO(isoPath string) error {

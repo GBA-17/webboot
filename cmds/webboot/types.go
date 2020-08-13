@@ -1,5 +1,11 @@
 package main
 
+import (
+	"fmt"
+
+	"github.com/u-root/NiChrome/pkg/wifi"
+)
+
 const (
 	tcURL    = "http://tinycorelinux.net/10.x/x86_64/release/TinyCorePure64-10.1.iso"
 	wbtcpURL = "https://github.com/u-root/webboot-distro/raw/master/iso/tinycore/10.x/x86_64/release/TinyCorePure64.iso"
@@ -61,4 +67,22 @@ type Interface struct {
 
 func (i *Interface) Label() string {
 	return i.label
+}
+
+type Network struct {
+	info wifi.Option
+}
+
+func (n *Network) Label() string {
+	switch n.info.AuthSuite {
+	case wifi.NoEnc:
+		return fmt.Sprintf("%s: No Passphrase\n", n.info.Essid)
+	case wifi.WpaPsk:
+		return fmt.Sprintf("%s: WPA-PSK (only passphrase)\n", n.info.Essid)
+	case wifi.WpaEap:
+		return fmt.Sprintf("%s: WPA-EAP (passphrase and identity)\n", n.info.Essid)
+	case wifi.NotSupportedProto:
+		return fmt.Sprintf("%s: Not a supported protocol\n", n.info.Essid)
+	}
+	return "Invalid wifi network."
 }

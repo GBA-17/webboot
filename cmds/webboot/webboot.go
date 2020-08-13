@@ -49,9 +49,9 @@ func (i *ISO) exec(uiEvents <-chan ui.Event, boot bool) error {
 // if this iso is existed in the bookmark, use it's url
 // elsewise ask for a download link
 func (d *DownloadOption) exec(uiEvents <-chan ui.Event, network bool) (menu.Entry, error) {
-	if network /*&& !connected()*/ {
+	if network && !connected() {
 		for {
-			ok, err := setupWirelessNetwork(uiEvents)
+			ok, err := setupNetwork(uiEvents)
 			if err != nil {
 				return nil, err
 			}

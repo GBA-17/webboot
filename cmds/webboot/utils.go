@@ -136,3 +136,32 @@ func setUpNetwork(uiEvents <-chan ui.Event) (bool, error) {
 		}
 	}
 }
+
+func setupWirelessNetwork(uiEvents <-chan ui.Event) (bool, error) {
+	interfaces, err := interfaceNames()
+	if err != nil {
+		return false, err
+	}
+
+	entries := []menu.Entry{}
+	for _, iface := range interfaces {
+		entries = append(entries, &Interface{label: iface})
+	}
+
+	var entry menu.Entry
+	for {
+		entry, err = menu.DisplayMenu("Network Interfaces", "Choose an option", entries, uiEvents)
+		if err != nil {
+			return false, err
+		}
+
+		if !interfaceIsWireless(entry.Label()) {
+			menu.DisplayResult([]string{"Only wireless network interfaces are supported."}, uiEvents)
+		} else {
+			break
+		}
+	}
+	menu.DisplayResult([]string{entry.Label()}, uiEvents)
+
+	return true, nil
+}

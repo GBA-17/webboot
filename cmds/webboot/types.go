@@ -54,3 +54,11 @@ type DirOption struct {
 func (d *DirOption) Label() string {
 	return d.label
 }
+
+type Interface struct {
+	label string
+}
+
+func (i *Interface) Label() string {
+	return i.label
+}

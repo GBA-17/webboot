@@ -23,17 +23,17 @@ func connected() bool {
 	return true
 }
 
-func interfaceNames() ([]string, error) {
+func interfaceEntries() ([]menu.Entry, error) {
 	interfaces, err := netlink.LinkList()
 	if err != nil {
 		return nil, err
 	}
 
-	var ifNames []string
+	var ifEntries []menu.Entry
 	for _, iface := range interfaces {
-		ifNames = append(ifNames, iface.Attrs().Name)
+		ifEntries = append(ifEntries, &Interface{label: iface.Attrs().Name})
 	}
-	return ifNames, nil
+	return ifEntries, nil
 }
 
 func interfaceIsWireless(ifname string) bool {
@@ -52,33 +52,28 @@ func setupNetwork(uiEvents <-chan ui.Event) (bool, error) {
 
 	err = selectWirelessNetwork(uiEvents, iface)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	return true, nil
 }
 
 func selectNetworkInterface(uiEvents <-chan ui.Event) (string, error) {
-	interfaces, err := interfaceNames()
+	ifEntries, err := interfaceEntries()
 	if err != nil {
 		return "", err
 	}
 
-	entries := []menu.Entry{}
-	for _, iface := range interfaces {
-		entries = append(entries, &Interface{label: iface})
-	}
-
 	for {
-		entry, err := menu.DisplayMenu("Network Interfaces", "Choose an option", entries, uiEvents)
+		iface, err := menu.DisplayMenu("Network Interfaces", "Choose an option", ifEntries, uiEvents)
 		if err != nil {
 			return "", err
 		}
 
-		if !interfaceIsWireless(entry.Label()) {
+		if !interfaceIsWireless(iface.Label()) {
 			menu.DisplayResult([]string{"Only wireless network interfaces are supported."}, uiEvents)
 		} else {
-			return entry.Label(), nil
+			return iface.Label(), nil
 		}
 	}
 }
@@ -90,17 +85,17 @@ func selectWirelessNetwork(uiEvents <-chan ui.Event, iface string) error {
 	}
 
 	for {
-		networks, err := worker.Scan()
+		networkScan, err := worker.Scan()
 		if err != nil {
 			return err
 		}
 
-		entries := []menu.Entry{}
-		for _, network := range networks {
-			entries = append(entries, &Network{info: network})
+		netEntries := []menu.Entry{}
+		for _, network := range networkScan {
+			netEntries = append(netEntries, &Network{info: network})
 		}
 
-		entry, err := menu.DisplayMenu("Wireless Networks", "Choose an option", entries, uiEvents)
+		entry, err := menu.DisplayMenu("Wireless Networks", "Choose an option", netEntries, uiEvents)
 		if err != nil {
 			return err
 		}
@@ -112,6 +107,7 @@ func selectWirelessNetwork(uiEvents <-chan ui.Event, iface string) error {
 
 		var setupParams = []string{network.info.Essid}
 		authSuite := network.info.AuthSuite
+
 		if authSuite == wifi.NotSupportedProto {
 			menu.DisplayResult([]string{"Security protocol is not supported."}, uiEvents)
 			continue
@@ -127,6 +123,7 @@ func selectWirelessNetwork(uiEvents <-chan ui.Event, iface string) error {
 			menu.DisplayResult([]string{err.Error()}, uiEvents)
 			continue
 		}
+
 		return nil
 	}
 }
@@ -143,10 +140,12 @@ func enterCredentials(uiEvents <-chan ui.Event, authSuite wifi.SecProto) ([]stri
 		return credentials, nil
 	}
 
+	// If not WpaPsk, the network uses WpaEap and also needs an identity
 	identity, err := menu.NewInputWindow("Enter identity:", menu.AlwaysValid, uiEvents)
 	if err != nil {
 		return nil, err
 	}
+
 	credentials = append(credentials, identity)
 	return credentials, nil
 }

@@ -44,10 +44,10 @@ func interfaceIsWireless(ifname string) bool {
 	return true
 }
 
-func setupNetwork(uiEvents <-chan ui.Event) error {
+func setupNetwork(uiEvents <-chan ui.Event) (bool, error) {
 	iface, err := selectNetworkInterface(uiEvents)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	return selectWirelessNetwork(uiEvents, iface)
@@ -73,16 +73,16 @@ func selectNetworkInterface(uiEvents <-chan ui.Event) (string, error) {
 	}
 }
 
-func selectWirelessNetwork(uiEvents <-chan ui.Event, iface string) error {
+func selectWirelessNetwork(uiEvents <-chan ui.Event, iface string) (bool, error) {
 	worker, err := wifi.NewIWLWorker(iface)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	for {
 		networkScan, err := worker.Scan()
 		if err != nil {
-			return err
+			return false, err
 		}
 
 		netEntries := []menu.Entry{}
@@ -92,62 +92,70 @@ func selectWirelessNetwork(uiEvents <-chan ui.Event, iface string) error {
 
 		entry, err := menu.DisplayMenu("Wireless Networks", "Choose an option", netEntries, uiEvents)
 		if err != nil {
-			return err
+			return false, err
 		}
 
 		network, ok := entry.(*Network)
 		if !ok {
-			return fmt.Errorf("Bad menu entry.")
+			return false, fmt.Errorf("Bad menu entry.")
 		}
 
-		if err := connectWirelessNetwork(uiEvents, worker, network.info); err != nil {
-			menu.DisplayResult([]string{err.Error()}, uiEvents)
+		if ok, err = connectWirelessNetwork(uiEvents, worker, network.info); !ok || err != nil {
+			if err != nil {
+				menu.DisplayResult([]string{err.Error()}, uiEvents)
+			}
 			continue
 		}
 
-		return nil
+		return true, nil
 	}
 }
 
-func connectWirelessNetwork(uiEvents <-chan ui.Event, worker wifi.WiFi, network wifi.Option) error {
+func connectWirelessNetwork(uiEvents <-chan ui.Event, worker wifi.WiFi, network wifi.Option) (bool, error) {
 	var setupParams = []string{network.Essid}
 	authSuite := network.AuthSuite
 
 	if authSuite == wifi.NotSupportedProto {
-		return fmt.Errorf("Security protocol is not supported.")
+		return false, fmt.Errorf("Security protocol is not supported.")
 	} else if authSuite == wifi.WpaPsk || authSuite == wifi.WpaEap {
-		credentials, err := enterCredentials(uiEvents, authSuite)
+		credentials, ok, err := enterCredentials(uiEvents, authSuite)
 		if err != nil {
-			return err
+			return false, err
+		} else if !ok {
+			return false, nil
 		}
 		setupParams = append(setupParams, credentials...)
 	}
 
 	if err := worker.Connect(setupParams...); err != nil {
-		return err
+		return false, err
 	}
 
-	return nil
+	return true, nil
 }
 
-func enterCredentials(uiEvents <-chan ui.Event, authSuite wifi.SecProto) ([]string, error) {
+func enterCredentials(uiEvents <-chan ui.Event, authSuite wifi.SecProto) ([]string, bool, error) {
 	var credentials []string
 	pass, err := menu.NewInputWindow("Enter password:", menu.AlwaysValid, uiEvents)
 	if err != nil {
-		return nil, err
+		return nil, false, err
+	} else if pass == "<Esc>" {
+		return nil, false, nil
 	}
 
 	credentials = append(credentials, pass)
 	if authSuite == wifi.WpaPsk {
-		return credentials, nil
+		return credentials, true, nil
 	}
 
 	// If not WpaPsk, the network uses WpaEap and also needs an identity
 	identity, err := menu.NewInputWindow("Enter identity:", menu.AlwaysValid, uiEvents)
 	if err != nil {
-		return nil, err
+		return nil, false, err
+	} else if identity == "<Esc>" {
+		return nil, false, nil
 	}
 
 	credentials = append(credentials, identity)
-	return credentials, nil
+	return credentials, true, nil
 }

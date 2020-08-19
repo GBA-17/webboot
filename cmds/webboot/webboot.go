@@ -52,34 +52,39 @@ func (i *ISO) exec(uiEvents <-chan ui.Event, boot bool) error {
 // elsewise ask for a download link
 func (d *DownloadOption) exec(uiEvents <-chan ui.Event, network bool, cacheDir string) (menu.Entry, error) {
 	if network && !connected() {
-		for {
-			ok, err := setupNetwork(uiEvents)
-			if err != nil {
-				return nil, err
-			}
-			if ok {
-				break
-			}
+		if err := setupNetwork(uiEvents); err != nil {
+			return nil, err
 		}
 	}
+
 	validIsoName := func(input string) (string, string, bool) {
 		re := regexp.MustCompile(`[\w]+.iso`)
+		if input == "" {
+			return "", bookmarkList, false
+		}
 		if re.Match([]byte(input)) {
 			return input, "", true
 		}
 		return "", "File name should only contain [a-zA-Z0-9_], and should end in .iso", false
 	}
-	filename, err := menu.NewInputWindow("Enter ISO name", validIsoName, uiEvents)
+	filename, err := menu.NewInputWindow("Enter ISO name (Enter <Esc> to go back):", validIsoName, uiEvents)
 	if err != nil {
 		return nil, err
+	}
+	if filename == "<Esc>" {
+		return &BackOption{}, nil
 	}
 
 	link, ok := bookmarks[filename]
 	if !ok {
-		if link, err = menu.NewInputWindow("Enter URL:", menu.AlwaysValid, uiEvents); err != nil {
+		if link, err = menu.NewInputWindow("Enter URL (Enter <Esc> to go back):", menu.AlwaysValid, uiEvents); err != nil {
 			return nil, err
 		}
 	}
+	if link == "<Esc>" {
+		return &BackOption{}, nil
+	}
+
 	// If the cachedir is not find, downloaded the iso to /tmp, else create a Downloaded dir in the cache dir.
 	var fpath string
 	if cacheDir == "" {
@@ -185,6 +190,12 @@ func main() {
 	if *v {
 		verbose = log.Printf
 	}
+
+	bookmarkList = "We provide these isos' link:"
+	for key := range bookmarks {
+		bookmarkList += "\n" + key
+	}
+
 	cacheDir := *dir
 	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
 		menu.DisplayResult([]string{fmt.Sprintf("the cache dir %v does not exist", cacheDir)}, ui.PollEvents())
@@ -212,6 +223,9 @@ func main() {
 		case *DownloadOption:
 			if entry, err = entry.(*DownloadOption).exec(ui.PollEvents(), *network, cacheDir); err != nil {
 				log.Fatalf("Download option failed:%v", err)
+			}
+			if _, ok := entry.(*BackOption); ok {
+				entry = getMainMenu(cacheDir)
 			}
 		case *ISO:
 			if err = entry.(*ISO).exec(ui.PollEvents(), !*dryRun); err != nil {

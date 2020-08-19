@@ -1,5 +1,5 @@
 package main
-
+ 
 import (
 	"fmt"
 
@@ -17,6 +17,8 @@ var bookmarks = map[string]string{
 	"TinyCorePure64-10.1.iso": tcURL,
 	"TinyCorePure64.iso":      wbtcpURL,
 }
+
+var bookmarkList string
 
 // ISO contains information of the iso user want to boot
 type ISO struct {
@@ -68,17 +70,6 @@ func (d *DirOption) Label() string {
 	return d.label
 }
 
-// BackOption let user back to the upper menu
-type BackOption struct {
-}
-
-var _ = menu.Entry(&BackOption{})
-
-// Label is the string this iso displays in the menu page.
-func (b *BackOption) Label() string {
-	return "Go Back"
-}
-
 type Interface struct {
 	label string
 }
@@ -103,4 +94,15 @@ func (n *Network) Label() string {
 		return fmt.Sprintf("%s: Not a supported protocol\n", n.info.Essid)
 	}
 	return "Invalid wifi network."
+}
+
+// BackOption let user back to the upper menu
+type BackOption struct {
+}
+
+var _ = menu.Entry(&BackOption{})
+
+// Label is the string this iso displays in the menu page.
+func (b *BackOption) Label() string {
+	return "Go Back"
 }

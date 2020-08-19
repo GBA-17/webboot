@@ -44,18 +44,13 @@ func interfaceIsWireless(ifname string) bool {
 	return true
 }
 
-func setupNetwork(uiEvents <-chan ui.Event) (bool, error) {
+func setupNetwork(uiEvents <-chan ui.Event) error {
 	iface, err := selectNetworkInterface(uiEvents)
 	if err != nil {
-		return false, err
+		return err
 	}
 
-	err = selectWirelessNetwork(uiEvents, iface)
-	if err != nil {
-		return false, err
-	}
-
-	return true, nil
+	return selectWirelessNetwork(uiEvents, iface)
 }
 
 func selectNetworkInterface(uiEvents <-chan ui.Event) (string, error) {
@@ -105,27 +100,34 @@ func selectWirelessNetwork(uiEvents <-chan ui.Event, iface string) error {
 			return fmt.Errorf("Bad menu entry.")
 		}
 
-		var setupParams = []string{network.info.Essid}
-		authSuite := network.info.AuthSuite
-
-		if authSuite == wifi.NotSupportedProto {
-			menu.DisplayResult([]string{"Security protocol is not supported."}, uiEvents)
-			continue
-		} else if authSuite == wifi.WpaPsk || authSuite == wifi.WpaEap {
-			credentials, err := enterCredentials(uiEvents, authSuite)
-			if err != nil {
-				return err
-			}
-			setupParams = append(setupParams, credentials...)
-		}
-
-		if err := worker.Connect(setupParams...); err != nil {
+		if err := connectWirelessNetwork(uiEvents, worker, network.info); err != nil {
 			menu.DisplayResult([]string{err.Error()}, uiEvents)
 			continue
 		}
 
 		return nil
 	}
+}
+
+func connectWirelessNetwork(uiEvents <-chan ui.Event, worker wifi.WiFi, network wifi.Option) error {
+	var setupParams = []string{network.Essid}
+	authSuite := network.AuthSuite
+
+	if authSuite == wifi.NotSupportedProto {
+		return fmt.Errorf("Security protocol is not supported.")
+	} else if authSuite == wifi.WpaPsk || authSuite == wifi.WpaEap {
+		credentials, err := enterCredentials(uiEvents, authSuite)
+		if err != nil {
+			return err
+		}
+		setupParams = append(setupParams, credentials...)
+	}
+
+	if err := worker.Connect(setupParams...); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func enterCredentials(uiEvents <-chan ui.Event, authSuite wifi.SecProto) ([]string, error) {

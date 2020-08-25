@@ -80,10 +80,12 @@ func selectWirelessNetwork(uiEvents <-chan ui.Event, iface string) error {
 	}
 
 	for {
+		progress := menu.NewProgress("Scanning for wifi networks", true)
 		networkScan, err := worker.Scan()
 		if err != nil {
 			return err
 		}
+		progress.Close()
 
 		netEntries := []menu.Entry{}
 		for _, network := range networkScan {
@@ -123,7 +125,10 @@ func connectWirelessNetwork(uiEvents <-chan ui.Event, worker wifi.WiFi, network 
 		setupParams = append(setupParams, credentials...)
 	}
 
-	if err := worker.Connect(setupParams...); err != nil {
+	progress := menu.NewProgress("Connecting to network", true)
+	err := worker.Connect(setupParams...)
+	progress.Close()
+	if err != nil {
 		return err
 	}
 

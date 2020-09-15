@@ -83,6 +83,27 @@ func TestProcessInputComplex(t *testing.T) {
 	}
 }
 
+func TestProcessInputLong(t *testing.T) {
+	testText := "vga=791 splash=quiet mediacheck=1 plymouth.enable=0 " +
+		"iso-scan/filename=/mnt/nerf-123952345/Images/Downloaded/openSUSE-Leap-15.2-KDE-Live-x86_64-Build31.135-Media.iso"
+
+	var testInput []string
+	for i := 0; i < len(testText); i++ {
+		testInput = append(testInput, testText[i:i+1])
+	}
+	testInput = append(testInput, "<Enter>")
+
+	uiEvents := make(chan ui.Event)
+	go pressKey(uiEvents, testInput)
+
+	input, _, err := processInput("test processInput long", 0, 50, 1, AlwaysValid, uiEvents)
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	} else if input != testText {
+		t.Errorf("Incorrect value for input. got: %v, want: %v", input, testText)
+	}
+}
+
 func TestDisplayResult(t *testing.T) {
 	for _, tt := range []struct {
 		name      string

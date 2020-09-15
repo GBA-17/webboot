@@ -80,8 +80,9 @@ func processInput(introwords string, location int, wid int, ht int, isValid vali
 	intro := newParagraph(introwords, false, location, len(introwords)+4, 3)
 	location += 2
 	input := newParagraph("", true, location, wid, ht+2)
-	location += ht + 2
-	warning := newParagraph("<Esc> to go back, <Ctrl+d> to exit", false, location, wid, 15)
+
+	inputLowerBound := location + ht + 2
+	warning := newParagraph("<Esc> to go back, <Ctrl+d> to exit", false, inputLowerBound, wid, 15)
 
 	ui.Render(intro)
 	ui.Render(input)
@@ -94,7 +95,8 @@ func processInput(introwords string, location int, wid int, ht int, isValid vali
 		case "<C-d>":
 			return input.Text, warning.Text, io.EOF
 		case "<Enter>":
-			inputString, warningString, ok := isValid(input.Text)
+			cleanedInput := strings.Replace(input.Text, "\n", "", -1)
+			inputString, warningString, ok := isValid(cleanedInput)
 			if ok {
 				return inputString, warning.Text, nil
 			}
@@ -104,20 +106,39 @@ func processInput(introwords string, location int, wid int, ht int, isValid vali
 			ui.Render(warning)
 		case "<Backspace>":
 			if len(input.Text) > 0 {
+				// Shrink input box if we are at the start of a new line
+				if len(input.Text)%(wid-2) == 2 && len(input.Text) >= wid-2 {
+					inputLowerBound -= 1
+					input.Text = input.Text[:len(input.Text)-1]
+					input.SetRect(0, location, wid, inputLowerBound)
+					warning.SetRect(0, inputLowerBound, wid, inputLowerBound+15)
+					ui.Render(warning)
+				}
+
 				input.Text = input.Text[:len(input.Text)-1]
 				ui.Render(input)
 			}
 		case "<Escape>":
 			return "", "", BackRequest
-		case "<Space>":
-			input.Text += " "
-			ui.Render(input)
 		default:
 			// the termui use a string begin at '<' to represent some special keys
-			// for example the 'F1' key will be parsed to "<F1>" string .
-			// we should do nothing when meet these special keys, we only care about alphabets and digits.
-			if k[0:1] != "<" {
-				input.Text += k
+			// for example the 'F1' key will be parsed to "<F1>" string
+			// Aside from <Space>, we only care about alphabet and digit characters
+			if k == "<Space>" || k[0:1] != "<" {
+				// Add new line to the input box if we are at the end of current line
+				if len(input.Text)%(wid-2) == 0 && len(input.Text) >= wid-2 {
+					inputLowerBound += 1
+					input.Text += "\n"
+					input.SetRect(0, location, wid, inputLowerBound)
+					warning.SetRect(0, inputLowerBound, wid, inputLowerBound+15)
+					ui.Render(warning)
+				}
+
+				if k == "<Space>" {
+					input.Text += " "
+				} else {
+					input.Text += k
+				}
 				ui.Render(input)
 			}
 		}
